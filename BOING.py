@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 """
+BOING! IS LICENSED UNDER MIT.
+######################
+#THIS FILE IS PART OF#
+#      BOING!        #
+#                    #
+######################
+"""
+
+"""
 Pong game using pygame-ce with:
 - main menu, settings, particle effects, delta-timing, impact effects
 - rebindable controls (persisted in config.pickle)
@@ -666,7 +675,7 @@ def controls_rebind_menu(screen, clock, title_font, menu_font, small_font, setti
                         awaiting_key = False
                         awaiting_action_key = None
                     elif event.key in (pg.K_BACKSPACE, pg.K_DELETE):
-                        bindings[awaiting_action_key] = None
+                        bindings[awaiting_action_key] = None # AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
                         save_settings(settings)
                         awaiting_key = False
                         awaiting_action_key = None
@@ -768,7 +777,7 @@ def show_winner_and_wait(screen, clock, font, left, right, ball, winner_text, wa
 
 
 # --- Main game ---
-def run_game(screen, clock, font, small_font, mode, settings):
+def  run_game(screen, clock, font, small_font, mode, settings):
     global DEBUG, JOYSTICKS
 
     left = Paddle(20, HEIGHT // 2 - PADDLE_HEIGHT // 2)
