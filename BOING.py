@@ -200,7 +200,7 @@ def joystick_info_summary():
         try:
             lines.append(f"#{j.get_id()} {j.get_name()} axes={j.get_numaxes()} buttons={j.get_numbuttons()} hats={j.get_numhats()}")
         except Exception:
-            lines.append("<joystick?>")
+            lines.append("[joystick?]")
     return lines
 
 
@@ -346,6 +346,8 @@ def get_particle_count(settings, base):
         return max(1, int(base * 0.5))
     if q == "High":
         return int(base * 1.8)
+    if q == "Very High":
+        return int(base * 2.9)
     return base
 
 
@@ -451,6 +453,8 @@ def credits_menu(screen, clock, title_font, menu_font, small_font):
         "  (Anuke) — credit to Anuke and the Mindustry project.",
         "  Source / more info: https://anuke.itch.io/mindustry",
         "",
+        "Sounds:",
+        "- Thanks to code the classics volume 2 for providing the sound files used from the kinetix game for use in BOING!"
         "Libraries:",
         "- pygame-ce (pygame community edition)",
         "",
