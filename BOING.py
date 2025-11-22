@@ -16,19 +16,9 @@ Pong game using pygame-ce with:
 - debug overlay (F3)
 - settings persisted to per-user config path via pickle
 
-Controller support (optional):
-- If one or more joysticks are connected they are initialized automatically.
-- Default runtime mapping:
-  - Joystick 0 axis 1 -> Left paddle (vertical). Up is negative axis value -> moves up.
-  - Joystick 1 axis 1 -> Right paddle (vertical), if present.
-  - If only one joystick and it has >=4 axes, joystick 0 axis 3 -> Right paddle (vertical).
-  - D-pad / hat (if available) also controls paddles (hat y -1/0/1).
-  - Buttons (generic mapping):
-      button 0 -> Reset scores
-      button 1 -> Return to menu
-      button 2 -> Toggle debug overlay
-  - Keyboard bindings (rebindable) still work and are persisted; controller input is additive (if controller active it will override paddle movement).
-- This is intentionally lightweight plug-and-play controller support; if you want controller bindings persisted like keyboard rebinds I can add that next.
+This update: all menus and confirmation popups are mouse-clickable.
+You can now click menu entries, settings rows, remap controls rows and popup
+Yes/No buttons with the mouse as well as using keyboard/gamepad navigation.
 """
 import random
 import sys, os
@@ -357,11 +347,16 @@ def colored_confirm_popup(screen, clock, small_font, message, title="Confirm", t
     Modal confirmation popup with a colored title. Returns True if user selects Yes, False otherwise.
     Navigation: Left/Right or A/D to select, Enter to confirm, Esc to cancel (No).
     Gamepad: button 0 = Yes, button 1 = No.
+    Mouse: click the Yes/No rendered buttons.
     """
     selected_yes = True
     w, h = 560, 160
     rect_x = (WIDTH - w) // 2
     rect_y = (HEIGHT - h) // 2
+
+    # positions for buttons inside overlay (relative)
+    yes_offset_x = w // 2 - 72
+    no_offset_x = w // 2 + 72
 
     while True:
         dt = clock.tick(FPS)
@@ -381,6 +376,17 @@ def colored_confirm_popup(screen, clock, small_font, message, title="Confirm", t
                 if ev.button == 0:
                     return True
                 if ev.button == 1:
+                    return False
+            if ev.type == pg.MOUSEBUTTONDOWN and ev.button == 1:
+                mx, my = ev.pos
+                # compute yes/no rects in screen coords
+                yes_surf = small_font.render(yes_text, True, WHITE)
+                no_surf = small_font.render(no_text, True, WHITE)
+                yes_rect = yes_surf.get_rect(center=(rect_x + yes_offset_x, rect_y + h - 40))
+                no_rect = no_surf.get_rect(center=(rect_x + no_offset_x, rect_y + h - 40))
+                if yes_rect.collidepoint(mx, my):
+                    return True
+                if no_rect.collidepoint(mx, my):
                     return False
 
         overlay = pg.Surface((w, h), pg.SRCALPHA)
@@ -409,8 +415,11 @@ def colored_confirm_popup(screen, clock, small_font, message, title="Confirm", t
         no_col = ACCENT if not selected_yes else WHITE
         yes_surf = small_font.render(yes_text, True, yes_col)
         no_surf = small_font.render(no_text, True, no_col)
-        overlay.blit(yes_surf, (w // 2 - 72 - yes_surf.get_width() // 2, h - 40))
-        overlay.blit(no_surf, (w // 2 + 72 - no_surf.get_width() // 2, h - 40))
+        # draw centered in overlay
+        yes_rect = yes_surf.get_rect(center=(yes_offset_x, h - 40))
+        no_rect = no_surf.get_rect(center=(no_offset_x, h - 40))
+        overlay.blit(yes_surf, yes_rect.topleft)
+        overlay.blit(no_surf, no_rect.topleft)
 
         dark = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
         dark.fill((0, 0, 0, 140))
@@ -440,7 +449,7 @@ def reset_settings_flow(screen, clock, small_font):
 def credits_menu(screen, clock, title_font, menu_font, small_font):
     """
     Displays credits and attribution including music credit to Mindustry.
-    Press any key or joystick button to return.
+    Press any key or joystick button to return. Mouse click also returns.
     """
     lines = [
         "CREDITS",
@@ -454,14 +463,15 @@ def credits_menu(screen, clock, title_font, menu_font, small_font):
         "  Source / more info: https://anuke.itch.io/mindustry",
         "",
         "Sounds:",
-        "- Thanks to code the classics volume 2 for providing the sound files used from the kinetix game for use in BOING!"
+        "- Thanks to code the classics volume 2 for providing the sound files used from the kinetix game for use in BOING!",
+        "",
         "Libraries:",
         "- pygame-ce (pygame community edition)",
         "",
         "Special thanks:",
         "- Mindustry (for the menu music)",
         "",
-        "Press any key or joystick button to return.",
+        "Press any key or joystick button or click to return.",
     ]
 
     while True:
@@ -469,7 +479,7 @@ def credits_menu(screen, clock, title_font, menu_font, small_font):
         for ev in pg.event.get():
             if ev.type == pg.QUIT:
                 return None
-            if ev.type == pg.KEYDOWN or ev.type == pg.JOYBUTTONDOWN or ev.type == pg.MOUSEBUTTONDOWN:
+            if ev.type in (pg.KEYDOWN, pg.JOYBUTTONDOWN, pg.MOUSEBUTTONDOWN):
                 return None
 
         screen.fill(BG)
@@ -495,6 +505,7 @@ def main_menu(screen, clock, title_font, menu_font, small_font, settings):
 
     while True:
         dt_ms = clock.tick(FPS)
+        mouse_rects = []  # list of (rect, index)
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return None
@@ -515,6 +526,21 @@ def main_menu(screen, clock, title_font, menu_font, small_font, settings):
                         return "settings"
                     else:
                         return None
+            elif event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                # check clicks on rendered menu items
+                for rect, idx in mouse_rects:
+                    if rect.collidepoint(mx, my):
+                        selected = idx
+                        choice = menu_items[selected]
+                        if choice == "1 Player":
+                            return "1p"
+                        elif choice == "2 Players":
+                            return "2p"
+                        elif choice == "Settings":
+                            return "settings"
+                        else:
+                            return None
 
         screen.fill(BG)
         title_surf = title_font.render("BOING!", True, ACCENT)
@@ -522,10 +548,15 @@ def main_menu(screen, clock, title_font, menu_font, small_font, settings):
 
         start_y = 200
         gap = 50
+        mouse_rects.clear()
         for i, item in enumerate(menu_items):
             color = HIGHLIGHT if i == selected else WHITE
             surf = menu_font.render(item, True, color)
-            screen.blit(surf, (WIDTH // 2 - surf.get_width() // 2, start_y + i * gap))
+            x = WIDTH // 2 - surf.get_width() // 2
+            y = start_y + i * gap
+            rect = pg.Rect(x, y, surf.get_width(), surf.get_height())
+            mouse_rects.append((rect, i))
+            screen.blit(surf, (x, y))
 
         help_surf = small_font.render("Use Up/Down and Enter to choose. Esc to quit.", True, DARK)
         screen.blit(help_surf, (WIDTH // 2 - help_surf.get_width() // 2, HEIGHT - 40))
@@ -547,6 +578,7 @@ def settings_menu(screen, clock, title_font, menu_font, small_font, settings):
 
     while True:
         dt_ms = clock.tick(FPS)
+        mouse_rows = []  # (rect, index)
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return None
@@ -604,6 +636,39 @@ def settings_menu(screen, clock, title_font, menu_font, small_font, settings):
                         new = vals[(i + 1) % len(vals)]
                         settings_set_label_value(settings, label, new)
                         save_settings(settings)
+            elif event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                for rect, idx in mouse_rows:
+                    if rect.collidepoint(mx, my):
+                        selected = idx
+                        label, vals = options[selected]
+                        # emulate pressing Enter on that row
+                        if label == "Back":
+                            save_settings(settings)
+                            return settings
+                        if label == "Controls":
+                            res = controls_rebind_menu(screen, clock, title_font, menu_font, small_font, settings)
+                            if res is None:
+                                return None
+                            settings = res
+                            break
+                        if label == "Credits":
+                            credits_menu(screen, clock, title_font, menu_font, small_font)
+                            break
+                        if label == "Reset Settings":
+                            ok = reset_settings_flow(screen, clock, small_font)
+                            if ok:
+                                settings = DEFAULT_SETTINGS.copy()
+                                settings["controls"] = DEFAULT_SETTINGS["controls"].copy()
+                                save_settings(settings)
+                            break
+                        if vals:
+                            cur = settings_get_label_value(settings, label)
+                            i = vals.index(cur)
+                            new = vals[(i + 1) % len(vals)]
+                            settings_set_label_value(settings, label, new)
+                            save_settings(settings)
+                            break
 
         screen.fill(BG)
         title_surf = title_font.render("SETTINGS", True, ACCENT)
@@ -611,12 +676,16 @@ def settings_menu(screen, clock, title_font, menu_font, small_font, settings):
 
         start_y = 170
         gap = 50
+        mouse_rows.clear()
         for i, (label, vals) in enumerate(options):
             y = start_y + i * gap
             sel = (i == selected)
             color = HIGHLIGHT if sel else WHITE
             label_surf = menu_font.render(label, True, color)
-            screen.blit(label_surf, (WIDTH // 2 - 260, y))
+            label_x = WIDTH // 2 - 260
+            label_rect = pg.Rect(label_x, y, 520, label_surf.get_height())
+            mouse_rows.append((label_rect, i))
+            screen.blit(label_surf, (label_x, y))
             if vals:
                 cur = settings_get_label_value(settings, label)
                 val_surf = menu_font.render(cur, True, WHITE if not sel else ACCENT)
@@ -647,7 +716,7 @@ def settings_set_label_value(settings, label, value):
         settings["sound"] = (value == "On")
 
 
-# controls_rebind_menu remains unchanged except small "[UNBOUND]" label
+# controls_rebind_menu remains unchanged except small "[UNBOUND]" label, now mouse-clickable rows
 def controls_rebind_menu(screen, clock, title_font, menu_font, small_font, settings):
     actions = [
         ("Left Up", "left_up"),
@@ -666,6 +735,7 @@ def controls_rebind_menu(screen, clock, title_font, menu_font, small_font, setti
     awaiting_action_key = None
 
     bindings = settings.get("controls", {}).copy()
+    mouse_rows = []
 
     while True:
         dt_ms = clock.tick(FPS)
@@ -688,6 +758,9 @@ def controls_rebind_menu(screen, clock, title_font, menu_font, small_font, setti
                         save_settings(settings)
                         awaiting_key = False
                         awaiting_action_key = None
+                elif event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                    # don't interpret mouse clicks while binding
+                    pass
                 continue
 
             if event.type == pg.KEYDOWN:
@@ -724,6 +797,38 @@ def controls_rebind_menu(screen, clock, title_font, menu_font, small_font, setti
                     label, key = actions[selected]
                     if key not in ("__back__", "__reset_defaults__", "__apply__"):
                         bindings[key] = None
+            elif event.type == pg.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                # check rows
+                for rect, idx in mouse_rows:
+                    if rect.collidepoint(mx, my):
+                        # select the clicked row
+                        selected = idx
+                        label, key = actions[selected]
+                        if key == "__back__":
+                            return settings
+                        if key == "__reset_defaults__":
+                            bindings = DEFAULT_SETTINGS["controls"].copy()
+                            break
+                        if key == "__apply__":
+                            all_unbound = True
+                            for k, v in bindings.items():
+                                if v:
+                                    all_unbound = False
+                                    break
+                            if all_unbound:
+                                msg = "WARNING: you have unbound all keys! are you sure you want to apply this change?"
+                                confirm = colored_confirm_popup(screen, clock, small_font, msg, title="WARNING", title_color=(220, 180, 40), yes_text="Apply", no_text="Cancel")
+                                if not confirm:
+                                    break
+                            settings["controls"] = bindings.copy()
+                            save_settings(settings)
+                            return settings
+                        else:
+                            # start binding for this action
+                            awaiting_key = True
+                            awaiting_action_key = key
+                            break
 
         screen.fill(BG)
         title_surf = title_font.render("REMAP CONTROLS", True, ACCENT)
@@ -731,12 +836,16 @@ def controls_rebind_menu(screen, clock, title_font, menu_font, small_font, setti
 
         start_y = 140
         gap = 40
+        mouse_rows.clear()
         for i, (label, key) in enumerate(actions):
             y = start_y + i * gap
             sel = (i == selected)
             color = HIGHLIGHT if sel else WHITE
             label_surf = menu_font.render(label, True, color)
-            screen.blit(label_surf, (120, y))
+            label_x = 120
+            row_rect = pg.Rect(label_x, y, WIDTH - 240, label_surf.get_height())
+            mouse_rows.append((row_rect, i))
+            screen.blit(label_surf, (label_x, y))
 
             if key in ("__back__", "__reset_defaults__", "__apply__"):
                 val_text = ""
@@ -746,7 +855,7 @@ def controls_rebind_menu(screen, clock, title_font, menu_font, small_font, setti
             val_surf = menu_font.render(val_text, True, ACCENT if sel else WHITE)
             screen.blit(val_surf, (WIDTH - val_surf.get_width() - 120, y))
 
-        hint = small_font.render("Enter to rebind | Backspace to clear | Apply to commit | Esc to cancel", True, DARK)
+        hint = small_font.render("Enter to rebind | Backspace to clear | Click a row to rebind | Apply to commit | Esc to cancel", True, DARK)
         screen.blit(hint, (WIDTH // 2 - hint.get_width() // 2, HEIGHT - 40))
 
         if awaiting_key and awaiting_action_key:
